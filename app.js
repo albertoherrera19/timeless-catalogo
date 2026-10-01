@@ -345,7 +345,8 @@ function renderFicha(p){
       (p.disponible ? cuentaHTML(p, ahora, 'ficha-cuenta') : '') +
       '<dl class="datos">' +
         dato('Descripción y medidas', p.descripcion) +
-        dato('Tallas de pantalón', p.tallas) +
+        // En cinturones la talla es la del pantalón (así está en el Canva); en el resto, "Tallas" a secas.
+        dato(norm(p.categoria) === 'cinturones' ? 'Tallas de pantalón' : 'Tallas', p.tallas) +
         dato('Nota', p.nota) +
       '</dl>' +
       (p.disponible

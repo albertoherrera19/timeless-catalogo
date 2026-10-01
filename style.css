@@ -322,7 +322,7 @@ button{font-family:inherit;}
   cursor:pointer;
 }
 .sheet-pad{padding:16px 18px 0;}
-.sheet h2{margin:0 0 6px;font-size:22px;font-weight:800;letter-spacing:-0.01em;padding-right:50px;}
+.sheet h2{margin:0 0 12px;min-height:38px;display:flex;align-items:center;font-size:22px;font-weight:800;letter-spacing:-0.01em;padding-right:50px;}
 
 /* Galería de fotos: se desliza con el dedo; en escritorio hay flechas. */
 .galeria{position:relative;background:var(--chip);border-radius:17px 17px 0 0;overflow:hidden;}
