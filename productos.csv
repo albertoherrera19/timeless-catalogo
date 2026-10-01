@@ -1,0 +1,6 @@
+Producto,Categoría,Precio,PrecioOferta,OfertaHasta,Disponible,Fotos,Descripción,Tallas,Nota
+Cinturón Dark Knight,Cinturones,40,35,2026-09-28 23:59,SI,"fotos/prueba-1.svg, fotos/prueba-2.svg",Largo 111cm · Ancho 3.7cm · Grosor 3mm,28–40 (79–102cm de cintura),Máx. 1 hueco → 79cm cintura
+Cinturón White Spider,Cinturones,75,,,SI,"fotos/prueba-2.svg, fotos/prueba-3.svg, fotos/prueba-1.svg",115cm · Ancho 3.6cm · Grosor 3mm,30–40 (83–105cm de cintura),Máx. 1 hueco → 80cm cintura
+Collar Demon Cross,Collares,25,,,NO,fotos/prueba-3.svg,(Descripción de prueba: falta la real),,
+Collar Phantom Star,Collares,30,"24,9",2026-10-04 23:59,SI,"fotos/prueba-1.svg, fotos/prueba-3.svg",(Descripción de prueba: falta la real),,
+Anillos Duki,Anillos,25,,,SI,fotos/prueba-2.svg,(Descripción de prueba: falta la real),,Precio por el par

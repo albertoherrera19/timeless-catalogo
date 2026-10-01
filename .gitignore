@@ -1,3 +1,6 @@
 # Scripts locales para servir en localhost: NUNCA se suben (igual que en el dashboard).
 serve.ps1
 *.log
+
+# Configuración local de Claude (servidor de vista previa).
+.claude/
