@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Timeless Store — Catálogo</title>
+<meta name="description" content="Accesorios de streetwear en Lima: cinturones, collares, pant chains, anillos y lentes. Arma tu pedido y coordinamos por WhatsApp o Instagram.">
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#141414" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f7f5f1" media="(prefers-color-scheme: light)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Timeless">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <a class="marca" href="#" id="marcaLink">
+      <div class="eyebrow">Accesorios streetwear · Lima</div>
+      <div class="marca-nombre">Timeless Store</div>
+    </a>
+    <a class="carrito-btn" href="#/carrito" aria-label="Ver carrito">
+      Carrito <span class="carrito-num mono" id="carritoNum">0</span>
+    </a>
+  </div>
+  <!-- Atajos a cada categoría (se llenan solos según lo que haya en la hoja) -->
+  <nav class="cats" id="catsNav" aria-label="Categorías"></nav>
+</header>
+
+<div class="wrap">
+
+  <!-- Aviso de modo prueba (solo aparece mientras falte configurar algo en config.js) -->
+  <div class="setup-card" id="setupCard" hidden>
+    <div class="setup-title">⚠️ Página en modo prueba</div>
+    <div class="setup-body" id="setupBody"></div>
+  </div>
+
+  <main id="catalogo">
+    <div class="estado" id="estado">Cargando catálogo…</div>
+  </main>
+
+  <footer class="pie">
+    <div class="pie-info">
+      Pagas contraentrega, con Yape o transferencia.<br>
+      Envíos a provincias por Shalom y en Lima con motorizado.
+    </div>
+    <div class="pie-links">
+      <a id="pieInstagram" href="#" target="_blank" rel="noopener">Instagram</a>
+      <!-- Ley 32495: el Libro de Reclamaciones tiene que estar a menos de 2 clics del inicio. Aquí está a 1. -->
+      <a class="libro-link" href="reclamaciones.html">📖 Libro de Reclamaciones</a>
+    </div>
+    <div class="pie-copy">© Timeless Store · Lima, Perú</div>
+  </footer>
+
+</div>
+
+<!-- Ficha de producto -->
+<div class="overlay" id="fichaOverlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Ficha de producto">
+    <button type="button" class="sheet-close" data-cerrar aria-label="Cerrar">✕</button>
+    <div id="fichaBody"></div>
+  </div>
+</div>
+
+<!-- Carrito y cierre del pedido -->
+<div class="overlay" id="carritoOverlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Tu pedido">
+    <button type="button" class="sheet-close" data-cerrar aria-label="Cerrar">✕</button>
+    <div id="carritoBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+  // El service worker solo existe en http/https (abriendo el archivo con doble clic no hay).
+  if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+    var swRefreshing = false;
+    var hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (swRefreshing || !hadController) return;
+      swRefreshing = true;
+      window.location.reload();
+    });
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('service-worker.js').then(function (reg) {
+        reg.update();
+        reg.addEventListener('updatefound', function () {
+          var nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener('statechange', function () {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+              nw.postMessage && nw.postMessage('skipWaiting');
+            }
+          });
+        });
+      }).catch(function (err) {
+        console.log('SW no registrado:', err);
+      });
+    });
+  }
+</script>
+</body>
+</html>
