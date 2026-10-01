@@ -73,7 +73,7 @@ Qué mirar:
 
 Para verla como en celular desde la computadora: en Chrome, F12 y luego el ícono de celular arriba a la izquierda del panel.
 
-**Dónde está el trabajo:** en esa carpeta, en la rama `claude/gallant-borg-e36fc3`, con 5 commits locales. No lo junté con `main`. El archivo `serve.ps1` existe solo ahí y a propósito no se guarda en el repositorio.
+**Dónde está el trabajo:** en esa carpeta, en la rama `claude/gallant-borg-e36fc3`, con sus commits locales. No lo junté con `main`. El archivo `serve.ps1` existe solo ahí y a propósito no se guarda en el repositorio.
 
 ---
 
