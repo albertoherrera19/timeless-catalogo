@@ -1,5 +1,6 @@
 Producto,Categoría,Precio,PrecioOferta,OfertaHasta,Disponible,Fotos,Descripción,Tallas,Nota,Nuevo,EnvioGratis
 Cinturón White Spider,Cinturones,75,,,SI,,115cm · Ancho 3.6cm · Grosor 3mm,30–40 (83–105cm de cintura),Máx. 1 hueco → 80cm cintura,SI,SI
+Cinturón Black Spider,Cinturones,75,,,NO,,115cm · Ancho 3.6cm · Grosor 3mm,30–40 (83–105cm de cintura),Máx. 1 hueco → 80cm cintura,SI,SI
 Cinturón White Cross Deluxe,Cinturones,75,65,,SI,,115cm · Ancho 3.3cm · Grosor 3mm,30–40 (82–105cm de cintura),Máx. 1 hueco → 79cm cintura,,SI
 Cinturón Dark Knight,Cinturones,40,,,SI,,111cm · Ancho 3.7cm · Grosor 3mm,28–40 (79–102cm de cintura),,,
 Cinturón Redglow,Cinturones,35,,,SI,,110cm · Ancho 3cm · Grosor 3mm,28–40 (81–101cm de cintura),,,
@@ -8,6 +9,7 @@ Cinturón Iced Silver Y2K,Cinturones,45,,,NO,,113cm · Ancho 3cm · Grosor 3mm,2
 Cinturón Cemetery Cross,Cinturones,75,,,NO,,108cm · Ancho 3.5cm · Grosor 3mm,30–38 (76–99cm de cintura),,,SI
 Cinturón Hitboy,Cinturones,35,,,NO,,119cm · Ancho 3cm · Grosor 3mm,28–42 (80–110cm de cintura),Cinturas menores a 86cm con huecos adicionales sin costo,,
 Cinturón Chrome Hearts,Cinturones,40,,,NO,,110cm · Ancho 3cm · Grosor 4mm,28–34 (78–100cm de cintura),,,
+Cinturón Starglow,Cinturones,75,,,NO,,108cm · Ancho 3.5cm · Grosor 3mm,30–38 (76–99cm de cintura),Adaptable a cinturas menores a 77cm bajo pedido,,SI
 Collar Shadow Cross,Collares,30,,,SI,,,,,,
 Collar Starboy,Collares,20,,,SI,,,,,,
 Collar Aracnic Chain,Collares,30,,,SI,,Largo: 43cm + 5cm,,,,
@@ -17,6 +19,11 @@ Collar Spiderman,Collares,25,,,SI,,Largo: 60cm,,,,
 Collar Phantom Star,Collares,30,,,NO,,Largo: 46cm + 4.5cm,,,,
 Collar Gothic Cross,Collares,25,,,NO,,Largo: 60cm,,,,
 Collar Silver Rosary Chain,Collares,25,20,,NO,,,,,,
+Collar de Púas Punk,Collares,25,,,NO,,,,,,
+Collar Chrome Hearts,Collares,30,,,NO,,Largo: 60cm,,,,
+Collar Ameri Duki,Collares,40,,,NO,,Largo: 60cm · Acero inoxidable 316L,,"Promo: 2 x S/75, 3 x S/110",,
+Collar Gengar Morado,Collares,30,,,NO,,Acero inoxidable 316L,,Promo: 2 x S/55,,
+Collar Gengar Plateado,Collares,30,,,NO,,Acero inoxidable 316L,,Promo: 2 x S/55,,
 Pant Chain Skeleton,Pant chains,40,,,SI,,Largo: 47cm,,,,
 Pant Chain Spiderboy,Pant chains,35,,,SI,,Largo: 50cm,,,,
 Pant Chain Y2K Pearls,Pant chains,35,,,NO,,Largo: 46cm,,,,

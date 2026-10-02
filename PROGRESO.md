@@ -15,14 +15,14 @@
 - Ofertas con precio tachado; si tienen fecha, cuenta regresiva y vuelta sola al precio normal.
 - **Etiqueta "Nuevo"** y **"Envío gratis"** por producto. Si el pedido lleva al menos un producto con envío gratis, todo el pedido sale con envío gratis (en el carrito y en el mensaje).
 - Libro de Reclamaciones a un clic, con página provisional.
-- Se puede instalar en el celular; versión del caché: `timeless-catalogo-v2`.
+- Se puede instalar en el celular; versión del caché: `timeless-catalogo-v3`.
 - Mientras está en pruebas, la página le pide a Google que no la muestre en búsquedas.
 
 ## 2. De dónde salen los productos hoy
 
-Del archivo `productos.csv`, que se llenó copiando las páginas **visibles** del Canva (2 de octubre): 23 productos, 10 de ellos agotados (los que tienen la X).
+Del archivo `productos.csv`, que se llenó copiando las páginas **visibles** del Canva (2 de octubre): 30 productos. Los que tienen la X en el Canva, los de las páginas ocultas y el Black Spider (que aún no llega) salen como agotados.
 
-No se incluyeron los de las **páginas ocultas** del Canva (21 a 23): Cinturón Starglow, Collar de púas punk, Collar Chrome Hearts, Collar Ameri Duki y Collares Gengar. Tampoco la promo "Cinturón Dark Knight + Collar Demon Cross a S/60", porque es un combo y no un producto.
+La promo "Cinturón Dark Knight + Collar Demon Cross a S/60" no está: es un combo, no un producto. Tampoco Bullcore ni White Chrome Hearts (decisión de Alberto).
 
 Columnas de la hoja, en este orden:
 `Producto` · `Categoría` · `Precio` · `PrecioOferta` · `OfertaHasta` · `Disponible` · `Fotos` · `Descripción` · `Tallas` · `Nota` · `Nuevo` · `EnvioGratis`
