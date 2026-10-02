@@ -4,3 +4,9 @@ serve.ps1
 
 # Configuración local de Claude (servidor de vista previa).
 .claude/
+
+# El traspaso tiene datos internos del negocio (margen, ticket, costos de publicidad).
+# Vive fuera del repo y NUNCA se sube: este repo es publico.
+TRASPASO.md
+traspaso*.md
+contexto*.md

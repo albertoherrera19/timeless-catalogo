@@ -210,10 +210,31 @@ button{font-family:inherit;}
   display:block;
 }
 .prod.agotado .prod-foto img{opacity:.45;filter:grayscale(1);}
-.tag{
+.tags{
   position:absolute;
   top:8px;
   left:8px;
+  right:8px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px;
+}
+.tag-nuevo{background:var(--bone);color:var(--bg);}
+.envio-gratis{
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--ok);
+}
+.envio-gratis-caja{
+  margin-top:8px;
+  padding:10px 12px;
+  border:1px solid var(--ok);
+  border-radius:10px;
+  font-size:12px;
+}
+.tag{
   padding:4px 8px;
   border-radius:6px;
   font-size:10px;

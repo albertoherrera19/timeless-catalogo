@@ -14,15 +14,14 @@ const CATALOGO_CONFIG = {
   // 🚨 NUNCA pegar aquí el enlace de la pestaña "Stocks": tiene costos y márgenes.
   CSV_PRODUCTOS: 'productos.csv',
 
-  // TODO(Alberto): falta el número de WhatsApp. Va con código de país y sin
-  // espacios ni "+": por ejemplo '51987654321'. Mientras esté vacío, WhatsApp
-  // se abre con el pedido escrito pero sin destinatario (el cliente tendría
-  // que elegir el contacto), y la página muestra el aviso de "modo prueba".
-  WHATSAPP_NUMERO: '',
+  // Número de WhatsApp del negocio (el mismo del catálogo de Canva). Va con
+  // código de país y sin espacios ni "+".
+  WHATSAPP_NUMERO: '51960612770',
 
-  // TODO(Alberto): confirmar el usuario de Instagram. Hoy es 'timeless.store._'
-  // pero está pensando cambiarlo. Este es el ÚNICO lugar donde se escribe:
-  // sin "@" y sin la dirección completa.
+  // TODO(Alberto): cambiar a 'timeless.pe' EL MISMO DÍA que cambie el usuario
+  // en Instagram, no antes: si se cambia aquí primero, el botón llevaría a un
+  // perfil que no existe (o al de otra persona). Este es el ÚNICO lugar donde
+  // se escribe: sin "@" y sin la dirección completa.
   INSTAGRAM_USUARIO: 'timeless.store._',
 
   // Orden en que aparecen las categorías. Si en la hoja aparece una categoría

@@ -13,7 +13,7 @@ const CANT_MAX = 20;
 // Foto de reserva: se usa si un producto no tiene fotos o si un enlace está roto.
 const FOTO_VACIA = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" fill="#222"/>' +
-  '<text x="200" y="210" text-anchor="middle" font-family="sans-serif" font-size="22" font-weight="700" fill="#8a8680">SIN FOTO</text></svg>');
+  '<text x="200" y="210" text-anchor="middle" font-family="sans-serif" font-size="22" font-weight="700" fill="#8a8680">FOTO PRONTO</text></svg>');
 
 /* ---------- Utilidades de formato / parseo ---------- */
 function esc(s){ const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML.replace(/"/g,'&quot;'); }
@@ -91,6 +91,9 @@ function parseFechaLima(s){
   return Date.UTC(y, mo - 1, d, h + 5, mi, se);
 }
 
+// "SI", "sí", "x", "1"… cuentan como marcado.
+function esSi(s){ return ['si', 'x', '1', 'true', 'verdadero', 'yes'].indexOf(norm(s)) > -1; }
+
 /* ---------- Productos ---------- */
 let PRODUCTOS = [];
 let POR_ID = {};
@@ -125,6 +128,9 @@ function filasAProductos(rows){
       descripcion: col(r, 'descripcion'),
       tallas: col(r, 'tallas'),
       nota: col(r, 'nota'),
+      // Columnas opcionales: se marcan con SI. Vacío = no.
+      nuevo: esSi(col(r, 'nuevo')),
+      envioGratis: esSi(col(r, 'enviogratis')),
     });
   });
   // Un producto sin precio no se puede mostrar ni vender.
@@ -229,13 +235,19 @@ function agrupar(){
 
 function tarjetaHTML(p, ahora){
   const oferta = ofertaActiva(p, ahora);
-  let tag = '';
-  if(!p.disponible) tag = '<span class="tag tag-agotado">Agotado</span>';
-  else if(oferta) tag = '<span class="tag tag-oferta">Oferta</span>';
+  // Un agotado solo dice "Agotado": anunciarlo como nuevo o en oferta sería prometer algo que no hay.
+  let tags = '';
+  if(!p.disponible) tags = '<span class="tag tag-agotado">Agotado</span>';
+  else {
+    if(p.nuevo) tags += '<span class="tag tag-nuevo">Nuevo</span>';
+    if(oferta) tags += '<span class="tag tag-oferta">Oferta</span>';
+  }
   return '<a class="prod' + (p.disponible ? '' : ' agotado') + '" href="#/p/' + esc(p.id) + '">' +
-    '<div class="prod-foto"><img loading="lazy" src="' + esc(fotoPrincipal(p)) + '" alt="' + esc(p.nombre) + '">' + tag + '</div>' +
+    '<div class="prod-foto"><img loading="lazy" src="' + esc(fotoPrincipal(p)) + '" alt="' + esc(p.nombre) + '">' +
+    '<div class="tags">' + tags + '</div></div>' +
     '<div class="prod-info"><div class="prod-nombre">' + esc(p.nombre) + '</div>' +
     preciosHTML(p, ahora) +
+    (p.disponible && p.envioGratis ? '<div class="envio-gratis">Envío gratis</div>' : '') +
     (p.disponible ? cuentaHTML(p, ahora) : '') +
     '</div></a>';
 }
@@ -312,6 +324,10 @@ function renderContador(){
   el.classList.toggle('con', n > 0);
 }
 
+// Basta UN producto marcado con EnvioGratis para que todo el pedido vaya con
+// envío gratis (regla de Alberto: "si llevas ese producto, el envío es gratis").
+function pedidoConEnvioGratis(lineas){ return lineas.some(l => l.p.envioGratis); }
+
 // El pedido tal como le llega a Alberto por chat.
 function textoPedido(){
   const ahora = Date.now();
@@ -320,7 +336,8 @@ function textoPedido(){
   return '¡Hola Timeless! Quiero hacer este pedido:\n\n' +
     lineas.map(l => '• ' + l.cant + ' × ' + l.p.nombre + ' — ' + fmtPrecio(l.unit) +
       (l.cant > 1 ? ' c/u' : '') + (l.oferta ? ' (oferta)' : '')).join('\n') +
-    '\n\nTotal: ' + fmtPrecio(total) + ' (sin envío)\n\nPedido armado desde el catálogo web.';
+    '\n\nTotal: ' + fmtPrecio(total) + (pedidoConEnvioGratis(lineas) ? ' · Envío gratis' : ' (sin envío)') +
+    '\n\nPedido armado desde el catálogo web.';
 }
 
 /* ---------- Ficha de producto ---------- */
@@ -339,10 +356,11 @@ function renderFicha(p){
               '<div class="galeria-cuenta mono" id="galCuenta">1/' + fotos.length + '</div>' : '') +
     '</div>' +
     '<div class="sheet-pad">' +
-      '<div class="eyebrow">' + esc(p.categoria) + '</div>' +
+      '<div class="eyebrow">' + esc(p.categoria) + (p.nuevo && p.disponible ? ' · Nuevo' : '') + '</div>' +
       '<h2>' + esc(p.nombre) + '</h2>' +
       '<div class="ficha-precios">' + preciosHTML(p, ahora) + '</div>' +
       (p.disponible ? cuentaHTML(p, ahora, 'ficha-cuenta') : '') +
+      (p.disponible && p.envioGratis ? '<div class="envio-gratis" style="margin-top:8px">🚚 Envío gratis llevando este producto</div>' : '') +
       '<dl class="datos">' +
         dato('Descripción y medidas', p.descripcion) +
         // En cinturones la talla es la del pantalón (así está en el Canva); en el resto, "Tallas" a secas.
@@ -454,7 +472,10 @@ function renderCarrito(){
 
   body.innerHTML = '<div class="sheet-pad"><h2>Tu pedido</h2>' + filas +
     '<div class="total"><span>Total</span><b>' + fmtPrecio(total) + '</b></div>' +
-    '<p class="nota-chica">El envío se coordina por chat. Pagas contraentrega, con Yape o transferencia.</p>' +
+    (pedidoConEnvioGratis(validas)
+      ? '<div class="envio-gratis envio-gratis-caja">🚚 Tu pedido va con envío gratis</div>' +
+        '<p class="nota-chica">La entrega se coordina por chat. Pagas contraentrega, con Yape o transferencia.</p>'
+      : '<p class="nota-chica">El envío se coordina por chat. Pagas contraentrega, con Yape o transferencia.</p>') +
     (validas.length
       ? '<button type="button" class="btn btn-primario" data-paso="canal">Cerrar pedido</button>'
       : '<button type="button" class="btn" disabled>No hay productos disponibles en tu carrito</button>') +
@@ -598,7 +619,7 @@ function toast(msg){
 // la página no se publique por descuido con datos de mentira o sin WhatsApp.
 function renderAvisoConfig(){
   const faltan = [];
-  if(!/^https?:\/\//.test(cfg.CSV_PRODUCTOS || '')) faltan.push('Los productos son <b>datos de prueba</b> (todavía no se lee la hoja de Google).');
+  if(!/^https?:\/\//.test(cfg.CSV_PRODUCTOS || '')) faltan.push('Los productos salen de una <b>copia de tu Canva</b> guardada en la página (todavía no se lee la hoja de Google) y <b>faltan las fotos</b>.');
   if(!String(cfg.WHATSAPP_NUMERO || '').replace(/\D/g, '')) faltan.push('Falta el <b>número de WhatsApp</b>: el pedido se abre sin destinatario.');
   if(!cfg.INSTAGRAM_USUARIO) faltan.push('Falta el <b>usuario de Instagram</b>.');
   const card = document.getElementById('setupCard');
