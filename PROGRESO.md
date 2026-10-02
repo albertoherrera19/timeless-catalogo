@@ -15,7 +15,7 @@
 - Ofertas con precio tachado; si tienen fecha, cuenta regresiva y vuelta sola al precio normal.
 - **Etiqueta "Nuevo"** y **"Envío gratis"** por producto. Si el pedido lleva al menos un producto con envío gratis, todo el pedido sale con envío gratis (en el carrito y en el mensaje).
 - Libro de Reclamaciones a un clic, con página provisional.
-- Se puede instalar en el celular; versión del caché: `timeless-catalogo-v4`.
+- Se puede instalar en el celular; versión del caché: `timeless-catalogo-v5`.
 - Mientras está en pruebas, la página le pide a Google que no la muestre en búsquedas.
 
 ## 2. De dónde salen los productos hoy

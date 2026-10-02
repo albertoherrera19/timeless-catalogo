@@ -24,9 +24,10 @@ const CATALOGO_CONFIG = {
   // se escribe: sin "@" y sin la dirección completa.
   INSTAGRAM_USUARIO: 'timeless.store._',
 
-  // TODO(Alberto): falta el usuario de TikTok (sin "@"). Mientras esté vacío,
+  // Usuario de TikTok (sin "@"). Hoy es el mismo de Instagram; si cambia uno,
+  // revisar el otro. Si se deja vacío,
   // el botón de TikTok del pie no aparece.
-  TIKTOK_USUARIO: '',
+  TIKTOK_USUARIO: 'timeless.store._',
 
   // Orden en que aparecen las categorías. Si en la hoja aparece una categoría
   // que no está en esta lista, igual se muestra, al final.
