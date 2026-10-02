@@ -266,6 +266,27 @@ button{font-family:inherit;}
   text-align:center;
 }
 
+/* ---------- Envíos y pagos ---------- */
+.envios{display:grid;grid-template-columns:1fr;gap:12px;}
+@media (min-width:760px){ .envios{grid-template-columns:repeat(3, minmax(0, 1fr));} }
+.envio-card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:14px 16px;
+}
+.envio-titulo{font-size:15px;font-weight:800;}
+.envio-pago{
+  margin-top:4px;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--accent);
+}
+.envio-card p{margin:8px 0 0;font-size:13px;line-height:1.55;color:var(--muted);}
+.aviso-titulo{margin:16px 0 -4px;font-size:14px;font-weight:700;text-align:center;}
+
 /* ---------- Pie ---------- */
 .pie{
   margin-top:40px;

@@ -340,6 +340,23 @@ function textoPedido(){
     '\n\nPedido armado desde el catálogo web.';
 }
 
+/* ---------- "Avísame cuando vuelva" ----------
+   La lista de espera NO se guarda en la página (es pública y no tiene dónde
+   guardar datos privados). El cliente manda un mensaje ya escrito por WhatsApp
+   o Instagram: a Alberto le llega como un chat más, con el contacto de la
+   persona, y solo él lo ve. */
+let avisoCopiado = null;   // id del producto cuyo mensaje ya se copió para Instagram
+function textoAviso(p){ return '¡Hola Timeless! Quiero que me avisen cuando vuelva a haber stock de: ' + p.nombre; }
+function avisoHTML(p){
+  return '<button type="button" class="btn" disabled>Agotado</button>' +
+    '<p class="aviso-titulo">¿Quieres que te avisemos cuando vuelva?</p>' +
+    '<a class="btn btn-wa" href="' + esc(urlWhatsApp(textoAviso(p))) + '" target="_blank" rel="noopener">Avísame por WhatsApp</a>' +
+    (avisoCopiado === p.id
+      ? '<div class="copiado" style="margin-top:14px">✓ Mensaje copiado. Pégalo en nuestro chat de Instagram.</div>' +
+        '<a class="btn" href="' + esc(urlInstagram()) + '" target="_blank" rel="noopener">Abrir Instagram</a>'
+      : '<button type="button" class="btn" data-aviso-ig="' + esc(p.id) + '">Avísame por Instagram</button>');
+}
+
 /* ---------- Ficha de producto ---------- */
 function renderFicha(p){
   const ahora = Date.now();
@@ -369,7 +386,7 @@ function renderFicha(p){
       '</dl>' +
       (p.disponible
         ? '<button type="button" class="btn btn-primario" data-agregar="' + esc(p.id) + '">Agregar al carrito</button>'
-        : '<button type="button" class="btn" disabled>Agotado</button>') +
+        : avisoHTML(p)) +
       (enCarrito && p.disponible ? '<div class="en-carrito">Tienes ' + enCarrito + ' en tu carrito · <a href="#/carrito">Ver carrito</a></div>' : '') +
       (cfg.FRASE_TALLA ? '<p class="frase-talla">' + esc(cfg.FRASE_TALLA) + '</p>' : '') +
     '</div>';
@@ -387,6 +404,15 @@ document.getElementById('fichaBody').addEventListener('click', e => {
   if(nav){
     const pista = document.getElementById('galPista');
     pista.scrollBy({left: pista.clientWidth * Number(nav.dataset.gal), behavior:'smooth'});
+    return;
+  }
+  const aviso = e.target.closest('[data-aviso-ig]');
+  if(aviso){
+    const p = POR_ID[aviso.dataset.avisoIg];
+    copiar(textoAviso(p)).then(ok => {
+      if(ok){ avisoCopiado = p.id; renderFicha(p); }
+      else toast('No se pudo copiar. Escríbenos por Instagram con el nombre del producto.');
+    });
     return;
   }
   const add = e.target.closest('[data-agregar]');
@@ -621,6 +647,7 @@ function renderAvisoConfig(){
   const faltan = [];
   if(!/^https?:\/\//.test(cfg.CSV_PRODUCTOS || '')) faltan.push('Los productos salen de una <b>copia de tu Canva</b> guardada en la página (todavía no se lee la hoja de Google) y <b>faltan las fotos</b>.');
   if(!String(cfg.WHATSAPP_NUMERO || '').replace(/\D/g, '')) faltan.push('Falta el <b>número de WhatsApp</b>: el pedido se abre sin destinatario.');
+  if(!cfg.TIKTOK_USUARIO) faltan.push('Falta el <b>usuario de TikTok</b>: el botón no aparece hasta ponerlo.');
   if(!cfg.INSTAGRAM_USUARIO) faltan.push('Falta el <b>usuario de Instagram</b>.');
   const card = document.getElementById('setupCard');
   card.hidden = !faltan.length;
@@ -636,6 +663,11 @@ function renderTodo(){
 
 /* ---------- Arranque ---------- */
 document.getElementById('pieInstagram').href = urlInstagram();
+if(cfg.TIKTOK_USUARIO){
+  const tk = document.getElementById('pieTikTok');
+  tk.href = 'https://www.tiktok.com/@' + encodeURIComponent(cfg.TIKTOK_USUARIO);
+  tk.hidden = false;
+}
 renderAvisoConfig();
 renderContador();
 cargar();
