@@ -1,7 +1,7 @@
 # Progreso del catálogo web — Timeless Store
 
 **Última sesión:** 8 de octubre de 2026.
-**Estado:** en línea (en pruebas, no anunciado) en `albertoherrera19.github.io/timeless-catalogo`. Con los productos del Canva, sin fotos todavía.
+**Estado:** en línea (en pruebas, no anunciado) en `timeless-store.github.io/timeless-catalogo` (repositorio: `github.com/timeless-store/timeless-catalogo`). Con los productos del Canva, sin fotos todavía.
 
 ---
 
@@ -51,7 +51,7 @@
 
 ## 4. Pendientes de Alberto
 
-1. **Organización de GitHub** para que el enlace no lleve tu nombre (pasos en el chat). Después me pasas el nombre y yo reconecto.
+1. ~~Organización de GitHub~~ — hecho el 9 de octubre: el catálogo vive en `timeless-store`. (No protege el dashboard; eso va por el chat del dashboard.)
 2. **Decir cuáles son tus más vendidos** para armar la fila de Más vendidos.
 3. **Fotos y videos** en las carpetas de `Escritorio\Alberto\Timeless\fotos de productos`.
 4. **Revisar** el texto de la línea premium y los costos de envío mostrados (motorizado "desde S/10", Shalom "aprox. S/8"): están en `config.js`.
