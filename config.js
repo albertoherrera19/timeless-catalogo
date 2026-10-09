@@ -29,6 +29,32 @@ const CATALOGO_CONFIG = {
   // el botón de TikTok del pie no aparece.
   TIKTOK_USUARIO: 'timeless.store._',
 
+  // Promociones automáticas (combos, 2 x S/75, "segundo collar -S/5"…). Se prenden
+  // y apagan en promos.csv. Si el archivo no carga, la página funciona sin promos.
+  CSV_PROMOS: 'promos.csv',
+
+  // Cómo recibe el cliente su pedido. El costo es APROXIMADO: Alberto lo confirma
+  // por chat según el distrito. Si el pedido ya tiene envío gratis, todos cuestan 0.
+  // "costo" es el número que se suma al total aproximado; "etiqueta", lo que se lee.
+  ENVIOS: [
+    {id: 'recojo', nombre: 'Recojo en Plaza San Miguel', costo: 0, etiqueta: 'Gratis',
+     nota: 'Pagas al recibir (contraentrega). Coordinamos día y hora por chat.'},
+    {id: 'moto', nombre: 'Motorizado en Lima', costo: 10, etiqueta: 'desde S/10',
+     nota: 'Pagas al recibir (contraentrega). Llega de un día para otro, de 11am a 7pm. El costo exacto depende del distrito.'},
+    {id: 'shalom', nombre: 'Shalom — Lima y provincias', costo: 8, etiqueta: 'aprox. S/8',
+     nota: 'Pagas el producto antes de enviar (Yape o transferencia) y el envío al recibir. Llega de 1 a 3 días.'},
+  ],
+
+  // Líneas dentro de una categoría (columna "Linea" de la hoja). Si ningún
+  // producto de la categoría tiene línea, no se muestran los subtítulos.
+  // TODO(Alberto): revisar el texto de la línea premium; lo armé con lo que me
+  // dijiste (eco cuero, dije más llamativo, aleación de alta calidad).
+  LINEAS: [
+    {clave: 'Premium', titulo: 'Línea premium',
+     descripcion: 'Hechos de eco cuero, con un dije más llamativo y aleación de alta calidad.'},
+    {clave: 'Clásica', titulo: 'Línea clásica', descripcion: ''},
+  ],
+
   // Orden en que aparecen las categorías. Si en la hoja aparece una categoría
   // que no está en esta lista, igual se muestra, al final.
   CATEGORIAS: ['Cinturones', 'Collares', 'Pant chains', 'Anillos', 'Lentes'],

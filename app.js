@@ -7,6 +7,7 @@
 
 const cfg = (typeof CATALOGO_CONFIG !== 'undefined') ? CATALOGO_CONFIG : {};
 const CARRITO_KEY = 'timeless_catalogo_carrito';
+const ENVIO_KEY = 'timeless_catalogo_envio';
 const CACHE_KEY = 'timeless_catalogo_productos';
 const CANT_MAX = 20;
 
@@ -95,8 +96,15 @@ function parseFechaLima(s){
 function esSi(s){ return ['si', 'x', '1', 'true', 'verdadero', 'yes'].indexOf(norm(s)) > -1; }
 
 /* ---------- Productos ---------- */
-let PRODUCTOS = [];
+let PRODUCTOS = [];      // una fila del CSV = un producto vendible (con su propio stock y precio)
 let POR_ID = {};
+let ENTRADAS = [];       // lo que se ve en la grilla: un producto suelto, o un grupo de variantes (colores)
+let ENTRADA_POR_ID = {}; // id de entrada o de variante -> entrada
+let PROMOS = [];
+
+// Un enlace de Fotos que termine en .mp4/.webm/.mov se muestra como video.
+const EXT_VIDEO = /\.(mp4|webm|mov|m4v)(\?|#|$)/i;
+function esVideo(url){ return EXT_VIDEO.test(url); }
 
 // Convierte las filas del CSV en productos. Las columnas se buscan por NOMBRE
 // (sin importar acentos, mayúsculas ni el orden), así que mover una columna en
@@ -114,7 +122,9 @@ function filasAProductos(rows){
     let id = slug(nombre) || 'producto';
     // Dos productos con el mismo nombre no pueden compartir identificador.
     if(usados[id]){ usados[id]++; id += '-' + usados[id]; } else usados[id] = 1;
+    // Disponible: SI (o vacío) = hay; NO = agotado; PRONTO = todavía no llega.
     const disp = norm(col(r, 'disponible'));
+    const pronto = ['pronto', 'proximamente', 'proximo'].indexOf(disp) > -1;
     out.push({
       id: id,
       nombre: nombre,
@@ -123,7 +133,8 @@ function filasAProductos(rows){
       precioOferta: parseMoney(col(r, 'preciooferta')),
       ofertaHasta: parseFechaLima(col(r, 'ofertahasta')),
       // Solo se marca agotado con un NO explícito. Una celda vacía cuenta como disponible.
-      disponible: ['no', 'agotado', '0', 'false', 'falso'].indexOf(disp) === -1,
+      disponible: !pronto && ['no', 'agotado', '0', 'false', 'falso'].indexOf(disp) === -1,
+      proximamente: pronto,
       fotos: col(r, 'fotos').split(/[,\n]/).map(f => f.trim()).filter(Boolean),
       descripcion: col(r, 'descripcion'),
       tallas: col(r, 'tallas'),
@@ -131,11 +142,66 @@ function filasAProductos(rows){
       // Columnas opcionales: se marcan con SI. Vacío = no.
       nuevo: esSi(col(r, 'nuevo')),
       envioGratis: esSi(col(r, 'enviogratis')),
+      bestSeller: esSi(col(r, 'bestseller')),
+      // Variantes: dos filas con el mismo Grupo se muestran como UN producto
+      // con selector de opción (ej. Collar Gengar: Morado / Plateado).
+      grupo: col(r, 'grupo'),
+      variante: col(r, 'variante'),
+      // Línea dentro de la categoría (ej. Premium / Clásica en cinturones).
+      linea: col(r, 'linea'),
     });
   });
   // Un producto sin precio no se puede mostrar ni vender.
   return out.filter(p => p.precio > 0);
 }
+
+// Arma lo que se pinta en la grilla: cada producto suelto es una entrada, y las
+// filas con el mismo Grupo se juntan en una sola entrada con varias variantes.
+function construirEntradas(){
+  ENTRADAS = []; ENTRADA_POR_ID = {};
+  const porGrupo = {};
+  PRODUCTOS.forEach(p => {
+    let e;
+    if(p.grupo){
+      const k = norm(p.grupo);
+      e = porGrupo[k];
+      if(!e){
+        e = {id: 'g-' + slug(p.grupo), nombre: p.grupo, categoria: p.categoria, variantes: []};
+        porGrupo[k] = e;
+        ENTRADAS.push(e);
+      }
+    } else {
+      e = {id: p.id, nombre: p.nombre, categoria: p.categoria, variantes: []};
+      ENTRADAS.push(e);
+    }
+    e.variantes.push(p);
+    ENTRADA_POR_ID[p.id] = e;
+    ENTRADA_POR_ID[e.id] = e;
+  });
+  ENTRADAS.forEach(e => {
+    const v = e.variantes;
+    e.disponible = v.some(p => p.disponible);
+    e.proximamente = !e.disponible && v.some(p => p.proximamente);
+    e.nuevo = v.some(p => p.nuevo);
+    e.bestSeller = v.some(p => p.bestSeller);
+    e.linea = (v.find(p => p.linea) || {}).linea || '';
+    // Fotos de la ficha: las de todas las variantes, sin repetir y en orden.
+    // La foto "de los dos colores" va primero en la hoja y queda de portada.
+    e.fotos = [];
+    v.forEach(p => p.fotos.forEach(f => { if(e.fotos.indexOf(f) === -1) e.fotos.push(f); }));
+    // Al elegir una variante, la galería salta a la primera foto que solo es suya.
+    v.forEach(p => {
+      const propia = p.fotos.find(f => !v.some(o => o !== p && o.fotos.indexOf(f) > -1));
+      p.indiceFoto = Math.max(0, e.fotos.indexOf(propia || p.fotos[0]));
+    });
+  });
+}
+
+// Variante que representa a la entrada en la grilla: la primera con stock.
+function repVariante(e){
+  return e.variantes.find(p => p.disponible) || e.variantes.find(p => p.proximamente) || e.variantes[0];
+}
+function rangoEstado(e){ return e.disponible ? 0 : (e.proximamente ? 1 : 2); }
 
 // ¿La oferta está vigente en este instante?
 // - Sin PrecioOferta (o si no es menor al precio normal): no hay oferta.
@@ -149,7 +215,13 @@ function ofertaActiva(p, ahora){
   return ahora < p.ofertaHasta;
 }
 function precioVigente(p, ahora){ return ofertaActiva(p, ahora) ? p.precioOferta : p.precio; }
-function fotoPrincipal(p){ return p.fotos[0] || FOTO_VACIA; }
+
+// Foto para miniaturas: la primera que no sea video (propia, o de su grupo).
+function fotoEntrada(e){ return e.fotos.find(f => !esVideo(f)) || FOTO_VACIA; }
+function fotoDe(p){
+  const e = ENTRADA_POR_ID[p.id];
+  return p.fotos.find(f => !esVideo(f)) || (e ? fotoEntrada(e) : FOTO_VACIA);
+}
 
 function fmtCuenta(ms){
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -172,26 +244,122 @@ function cuentaHTML(p, ahora, clase){
          fmtCuenta(p.ofertaHasta - ahora) + '</b></div>';
 }
 
+/* ---------- Promociones automáticas ----------
+   Viven en su propio CSV (CSV_PROMOS), una fila por promo, así Alberto las
+   prende y apaga desde la hoja sin tocar código. Tipos:
+   - combo:     lleva TODOS los productos listados (A|B) por un precio total.
+   - paquete:   N unidades del alcance por un precio total (ej. 3 por S/110).
+   - descuento: por cada N unidades del alcance, se descuentan S/ Valor.
+   Alcance: nombres de producto o de grupo separados por "|", o "categoria:Collares".
+   Una unidad entra en UNA sola promo (la primera de la lista que la use), para
+   que nunca se sumen descuentos por error. */
+function filasAPromos(rows){
+  if(!rows.length) return [];
+  const idx = {};
+  rows[0].forEach((h, i) => { idx[norm(h)] = i; });
+  const col = (r, nombre) => { const i = idx[nombre]; return i == null ? '' : String(r[i] == null ? '' : r[i]).trim(); };
+  return rows.slice(1).map(r => ({
+    nombre: col(r, 'nombre'),
+    tipo: norm(col(r, 'tipo')),
+    alcance: col(r, 'productos').split('|').map(s => s.trim()).filter(Boolean),
+    cantidad: parseInt(col(r, 'cantidad'), 10) || 0,
+    valor: parseMoney(col(r, 'valor')),
+    hasta: parseFechaLima(col(r, 'hasta')),
+    activa: esSi(col(r, 'activa')),
+    texto: col(r, 'texto'),
+  })).filter(pr => pr.nombre && pr.alcance.length && pr.valor > 0);
+}
+function promoActiva(pr, ahora){
+  if(!pr.activa) return false;
+  if(pr.hasta === null) return true;
+  if(isNaN(pr.hasta)) return false;   // fecha mal escrita: no se aplica
+  return ahora < pr.hasta;
+}
+function coincideAlcance(token, p){
+  const t = norm(token);
+  if(t.indexOf('categoria:') === 0) return norm(p.categoria) === t.slice(10).trim();
+  return norm(p.nombre) === t || (!!p.grupo && norm(p.grupo) === t);
+}
+function enAlcance(pr, p){ return pr.alcance.some(t => coincideAlcance(t, p)); }
+const centavos = n => Math.round(n * 100) / 100;
+
+// Calcula qué promos se aplican a las líneas del carrito y cuánto descuentan.
+function aplicarPromos(lineas, ahora){
+  const unidades = [];
+  lineas.forEach(l => { for(let i = 0; i < l.cant; i++) unidades.push({p: l.p, precio: l.unit, usada: false}); });
+  const items = [];
+  let total = 0;
+  PROMOS.filter(pr => promoActiva(pr, ahora)).forEach(pr => {
+    let veces = 0, monto = 0;
+    if(pr.tipo === 'combo'){
+      for(;;){
+        const tomadas = [];
+        const completo = pr.alcance.every(t => {
+          const u = unidades.find(x => !x.usada && tomadas.indexOf(x) === -1 && coincideAlcance(t, x.p));
+          if(u) tomadas.push(u);
+          return !!u;
+        });
+        if(!completo) break;
+        const normal = tomadas.reduce((a, u) => a + u.precio, 0);
+        if(normal - pr.valor <= 0) break;     // el combo no conviene: no se aplica
+        tomadas.forEach(u => { u.usada = true; });
+        veces++; monto += normal - pr.valor;
+      }
+    } else if(pr.cantidad >= 1 && (pr.tipo === 'paquete' || pr.tipo === 'descuento')){
+      // Las unidades más caras entran primero al paquete.
+      const pool = unidades.filter(u => !u.usada && enAlcance(pr, u.p)).sort((a, b) => b.precio - a.precio);
+      for(let i = 0; i + pr.cantidad <= pool.length; i += pr.cantidad){
+        const grupo = pool.slice(i, i + pr.cantidad);
+        const normal = grupo.reduce((a, u) => a + u.precio, 0);
+        const d = pr.tipo === 'paquete' ? normal - pr.valor : Math.min(pr.valor, normal);
+        if(d <= 0) continue;
+        grupo.forEach(u => { u.usada = true; });
+        veces++; monto += d;
+      }
+    }
+    if(veces){ items.push({promo: pr, veces: veces, monto: centavos(monto)}); total += monto; }
+  });
+  return {items: items, total: centavos(total)};
+}
+// Textos de promo que se muestran en la ficha de un producto.
+function promosDe(p, ahora){
+  return PROMOS.filter(pr => pr.texto && promoActiva(pr, ahora) && enAlcance(pr, p)).map(pr => pr.texto);
+}
+
 /* ---------- Carga de datos ---------- */
+const PROMOS_KEY = 'timeless_catalogo_promos';
 function fetchCSV(url){
   const sep = url.indexOf('?') > -1 ? '&' : '?';
   return fetch(url + sep + '_cb=' + Date.now(), {cache:'no-store'})
     .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
     .then(parseCSV);
 }
-function loadCache(){
-  try{ return JSON.parse(localStorage.getItem(CACHE_KEY)) || null; }catch(e){ return null; }
+function loadCache(key){
+  try{ return JSON.parse(localStorage.getItem(key || CACHE_KEY)) || null; }catch(e){ return null; }
 }
-function saveCache(rows){
-  try{ localStorage.setItem(CACHE_KEY, JSON.stringify(rows)); }catch(e){}
+function saveCache(rows, key){
+  try{ localStorage.setItem(key || CACHE_KEY, JSON.stringify(rows)); }catch(e){}
 }
 
 function usarFilas(rows){
   PRODUCTOS = filasAProductos(rows);
   POR_ID = {};
   PRODUCTOS.forEach(p => { POR_ID[p.id] = p; });
+  construirEntradas();
   firmaOfertas = calcFirma(Date.now());
   renderTodo();
+}
+
+// Las promos son opcionales: si no cargan, la página funciona igual sin ellas.
+function cargarPromos(){
+  if(!cfg.CSV_PROMOS) return Promise.resolve();
+  return fetchCSV(cfg.CSV_PROMOS).then(rows => {
+    saveCache(rows, PROMOS_KEY);
+    PROMOS = filasAPromos(rows);
+  }).catch(() => {
+    const guardado = loadCache(PROMOS_KEY);
+    if(guardado) PROMOS = filasAPromos(guardado);
+  });
 }
 
 function cargar(){
@@ -200,15 +368,16 @@ function cargar(){
     estado.textContent = 'Falta configurar CSV_PRODUCTOS en config.js.';
     return;
   }
+  const promosListas = cargarPromos();
   fetchCSV(cfg.CSV_PRODUCTOS).then(rows => {
     saveCache(rows);
-    usarFilas(rows);
+    return promosListas.then(() => usarFilas(rows));
   }).catch(err => {
     // Sin conexión (o Google caído): se muestra la última copia que vio este
     // celular. Puede estar desactualizada, pero al cerrar por chat Alberto
     // confirma stock y precio de todas formas.
     const guardado = loadCache();
-    if(guardado){ usarFilas(guardado); return; }
+    if(guardado){ promosListas.then(() => usarFilas(guardado)); return; }
     console.log('No se pudo leer el catálogo:', err);
     estado.innerHTML = location.protocol === 'file:'
       ? 'Esta página no funciona abriendo el archivo con doble clic:<br>el navegador bloquea la lectura de los productos.<br>Hay que abrirla desde el servidor local (ver PROGRESO.md) o ya publicada.'
@@ -218,14 +387,20 @@ function cargar(){
 
 /* ---------- Grilla ---------- */
 // Agrupa por categoría respetando el orden de config.js. Una categoría que no
-// esté en esa lista igual aparece, al final.
+// esté en esa lista igual aparece, al final. Dentro de cada una van primero los
+// que hay, luego los que llegan pronto y al final los agotados (respetando el
+// orden de la hoja entre iguales), para que lo que se puede comprar se vea primero.
 function agrupar(){
   const orden = (cfg.CATEGORIAS || []).map(norm);
   const grupos = {};
-  PRODUCTOS.forEach(p => {
-    const k = norm(p.categoria);
-    if(!grupos[k]) grupos[k] = {nombre: p.categoria, id: 'cat-' + slug(p.categoria), items: []};
-    grupos[k].items.push(p);
+  ENTRADAS.forEach((e, i) => {
+    const k = norm(e.categoria);
+    if(!grupos[k]) grupos[k] = {nombre: e.categoria, id: 'cat-' + slug(e.categoria), items: []};
+    grupos[k].items.push({e: e, i: i});
+  });
+  Object.keys(grupos).forEach(k => {
+    grupos[k].items.sort((a, b) => (rangoEstado(a.e) - rangoEstado(b.e)) || (a.i - b.i));
+    grupos[k].items = grupos[k].items.map(x => x.e);
   });
   return Object.keys(grupos).sort((a, b) => {
     const ia = orden.indexOf(a), ib = orden.indexOf(b);
@@ -233,22 +408,37 @@ function agrupar(){
   }).map(k => grupos[k]);
 }
 
-function tarjetaHTML(p, ahora){
-  const oferta = ofertaActiva(p, ahora);
+// Separa una categoría en líneas (ej. Premium / Clásica) si la hoja las usa.
+function seccionesDe(items){
+  const lineas = cfg.LINEAS || [];
+  if(!lineas.length || !items.some(e => e.linea)) return [{items: items}];
+  const secs = lineas.map(l => ({titulo: l.titulo, desc: l.descripcion,
+    items: items.filter(e => norm(e.linea) === norm(l.clave))}));
+  const resto = items.filter(e => !lineas.some(l => norm(l.clave) === norm(e.linea)));
+  if(resto.length) secs.push({items: resto});
+  return secs.filter(s => s.items.length);
+}
+
+function tarjetaHTML(e, ahora){
+  const p = repVariante(e);
+  const oferta = e.disponible && ofertaActiva(p, ahora);
   // Un agotado solo dice "Agotado": anunciarlo como nuevo o en oferta sería prometer algo que no hay.
   let tags = '';
-  if(!p.disponible) tags = '<span class="tag tag-agotado">Agotado</span>';
+  if(e.proximamente) tags = '<span class="tag tag-nuevo">Próximamente</span>';
+  else if(!e.disponible) tags = '<span class="tag tag-agotado">Agotado</span>';
   else {
-    if(p.nuevo) tags += '<span class="tag tag-nuevo">Nuevo</span>';
+    if(e.nuevo) tags += '<span class="tag tag-nuevo">Nuevo</span>';
     if(oferta) tags += '<span class="tag tag-oferta">Oferta</span>';
   }
-  return '<a class="prod' + (p.disponible ? '' : ' agotado') + '" href="#/p/' + esc(p.id) + '">' +
-    '<div class="prod-foto"><img loading="lazy" src="' + esc(fotoPrincipal(p)) + '" alt="' + esc(p.nombre) + '">' +
+  const apagado = !e.disponible && !e.proximamente;
+  const opciones = e.variantes.length > 1 ? '<div class="variantes-txt">' + esc(e.variantes.map(v => v.variante || v.nombre).join(' · ')) + '</div>' : '';
+  return '<a class="prod' + (apagado ? ' agotado' : '') + '" href="#/p/' + esc(e.id) + '">' +
+    '<div class="prod-foto"><img loading="lazy" src="' + esc(fotoEntrada(e)) + '" alt="' + esc(e.nombre) + '">' +
     '<div class="tags">' + tags + '</div></div>' +
-    '<div class="prod-info"><div class="prod-nombre">' + esc(p.nombre) + '</div>' +
+    '<div class="prod-info"><div class="prod-nombre">' + esc(e.nombre) + '</div>' + opciones +
     preciosHTML(p, ahora) +
-    (p.disponible && p.envioGratis ? '<div class="envio-gratis">Envío gratis</div>' : '') +
-    (p.disponible ? cuentaHTML(p, ahora) : '') +
+    (e.disponible && p.envioGratis ? '<div class="envio-gratis">Envío gratis</div>' : '') +
+    (e.disponible ? cuentaHTML(p, ahora) : '') +
     '</div></a>';
 }
 
@@ -262,18 +452,36 @@ function renderGrilla(){
     main.innerHTML = '<div class="estado">Todavía no hay productos en el catálogo.</div>';
     return;
   }
-  nav.innerHTML = grupos.map(g => '<a href="#' + esc(g.id) + '" data-cat="' + esc(g.id) + '">' + esc(g.nombre) + '</a>').join('');
-  main.innerHTML = grupos.map(g =>
+  // "Más vendidos": solo aparece si en la hoja hay productos marcados con BestSeller = SI.
+  const mas = ENTRADAS.filter(e => e.bestSeller);
+  const masHTML = mas.length
+    ? '<section class="cat" id="cat-mas-vendidos"><h2 class="cat-titulo">Más vendidos</h2>' +
+      '<div class="fila">' + mas.map(e => tarjetaHTML(e, ahora)).join('') + '</div></section>'
+    : '';
+  nav.innerHTML = (mas.length ? '<a href="#cat-mas-vendidos" data-cat="cat-mas-vendidos">Más vendidos</a>' : '') +
+    grupos.map(g => '<a href="#' + esc(g.id) + '" data-cat="' + esc(g.id) + '">' + esc(g.nombre) + '</a>').join('');
+  main.innerHTML = masHTML + grupos.map(g =>
     '<section class="cat" id="' + esc(g.id) + '">' +
     '<h2 class="cat-titulo">' + esc(g.nombre) + ' <span class="cat-cuenta">' + g.items.length + '</span></h2>' +
-    '<div class="grilla">' + g.items.map(p => tarjetaHTML(p, ahora)).join('') + '</div>' +
+    seccionesDe(g.items).map(s =>
+      (s.titulo ? '<h3 class="sub-titulo">' + esc(s.titulo) + '</h3>' + (s.desc ? '<p class="sub-desc">' + esc(s.desc) + '</p>' : '') : '') +
+      '<div class="grilla">' + s.items.map(e => tarjetaHTML(e, ahora)).join('') + '</div>'
+    ).join('') +
     (cfg.FRASE_TALLA ? '<p class="frase-talla">' + esc(cfg.FRASE_TALLA) + '</p>' : '') +
     '</section>'
   ).join('');
 }
 
-// Los atajos de categoría bajan con scroll en vez de cambiar la dirección:
-// el "#" de la dirección se reserva para la ficha y el carrito.
+// Los atajos bajan con scroll en vez de cambiar la dirección: el "#" de la
+// dirección se reserva para la ficha y el carrito.
+document.addEventListener('click', e => {
+  const s = e.target.closest('[data-scroll]');
+  if(s){
+    e.preventDefault();
+    const sec = document.getElementById(s.dataset.scroll);
+    if(sec) sec.scrollIntoView();
+  }
+});
 document.getElementById('catsNav').addEventListener('click', e => {
   const a = e.target.closest('a[data-cat]');
   if(!a) return;
@@ -292,9 +500,15 @@ document.getElementById('marcaLink').addEventListener('click', e => {
 let carrito = {};
 try{ carrito = JSON.parse(localStorage.getItem(CARRITO_KEY)) || {}; }catch(e){ carrito = {}; }
 if(typeof carrito !== 'object' || Array.isArray(carrito)) carrito = {};
+// Cómo quiere recibirlo el cliente (opcional). Vacío = "lo coordino por chat".
+let envioSel = '';
+try{ envioSel = localStorage.getItem(ENVIO_KEY) || ''; }catch(e){ envioSel = ''; }
 
 function guardarCarrito(){
   try{ localStorage.setItem(CARRITO_KEY, JSON.stringify(carrito)); }catch(e){}
+}
+function guardarEnvio(){
+  try{ localStorage.setItem(ENVIO_KEY, envioSel); }catch(e){}
 }
 function sePuedePedir(p){ return !!p && p.disponible; }
 function setCantidad(id, n){
@@ -328,16 +542,36 @@ function renderContador(){
 // envío gratis (regla de Alberto: "si llevas ese producto, el envío es gratis").
 function pedidoConEnvioGratis(lineas){ return lineas.some(l => l.p.envioGratis); }
 
+// Todo lo que muestra el carrito y lleva el mensaje: productos, promos y envío.
+function calcularPedido(ahora){
+  const lineas = lineasValidas(ahora);
+  const subtotal = centavos(lineas.reduce((a, l) => a + l.sub, 0));
+  const pr = aplicarPromos(lineas, ahora);
+  const productos = centavos(subtotal - pr.total);
+  const gratis = pedidoConEnvioGratis(lineas);
+  const envio = (cfg.ENVIOS || []).find(x => x.id === envioSel) || null;
+  // Si el pedido tiene envío gratis, cuesta 0 sea cual sea el medio elegido.
+  const costoEnvio = envio ? (gratis ? 0 : envio.costo) : null;
+  return {lineas: lineas, subtotal: subtotal, promos: pr.items, descuento: pr.total,
+          productos: productos, gratis: gratis, envio: envio, costoEnvio: costoEnvio};
+}
+
 // El pedido tal como le llega a Alberto por chat.
 function textoPedido(){
-  const ahora = Date.now();
-  const lineas = lineasValidas(ahora);
-  const total = lineas.reduce((a, l) => a + l.sub, 0);
-  return '¡Hola Timeless! Quiero hacer este pedido:\n\n' +
-    lineas.map(l => '• ' + l.cant + ' × ' + l.p.nombre + ' — ' + fmtPrecio(l.unit) +
-      (l.cant > 1 ? ' c/u' : '') + (l.oferta ? ' (oferta)' : '')).join('\n') +
-    '\n\nTotal: ' + fmtPrecio(total) + (pedidoConEnvioGratis(lineas) ? ' · Envío gratis' : ' (sin envío)') +
-    '\n\nPedido armado desde el catálogo web.';
+  const ped = calcularPedido(Date.now());
+  let t = '¡Hola Timeless! Quiero hacer este pedido:\n\n' +
+    ped.lineas.map(l => '• ' + l.cant + ' × ' + l.p.nombre + ' — ' + fmtPrecio(l.unit) +
+      (l.cant > 1 ? ' c/u' : '') + (l.oferta ? ' (oferta)' : '')).join('\n');
+  if(ped.promos.length){
+    t += '\n\nPromos aplicadas:\n' + ped.promos.map(x => '• ' + x.promo.nombre +
+      (x.veces > 1 ? ' (×' + x.veces + ')' : '') + ': −' + fmtPrecio(x.monto)).join('\n');
+  }
+  t += '\n\nTotal productos: ' + fmtPrecio(ped.productos);
+  if(ped.gratis) t += '\nEnvío: gratis' + (ped.envio ? ' (' + ped.envio.nombre + ')' : '');
+  else if(ped.envio) t += '\nEnvío: ' + ped.envio.nombre + ' — ' + ped.envio.etiqueta;
+  else t += '\nEnvío: por coordinar';
+  if(!ped.gratis && ped.envio && ped.costoEnvio > 0) t += '\nTotal aprox.: ' + fmtPrecio(ped.productos + ped.costoEnvio);
+  return t + '\n\nPedido armado desde el catálogo web.';
 }
 
 /* ---------- "Avísame cuando vuelva" ----------
@@ -346,10 +580,14 @@ function textoPedido(){
    o Instagram: a Alberto le llega como un chat más, con el contacto de la
    persona, y solo él lo ve. */
 let avisoCopiado = null;   // id del producto cuyo mensaje ya se copió para Instagram
-function textoAviso(p){ return '¡Hola Timeless! Quiero que me avisen cuando vuelva a haber stock de: ' + p.nombre; }
+function textoAviso(p){
+  return p.proximamente
+    ? '¡Hola Timeless! Quiero que me avisen cuando llegue: ' + p.nombre
+    : '¡Hola Timeless! Quiero que me avisen cuando vuelva a haber stock de: ' + p.nombre;
+}
 function avisoHTML(p){
-  return '<button type="button" class="btn" disabled>Agotado</button>' +
-    '<p class="aviso-titulo">¿Quieres que te avisemos cuando vuelva?</p>' +
+  return '<button type="button" class="btn" disabled>' + (p.proximamente ? 'Próximamente' : 'Agotado') + '</button>' +
+    '<p class="aviso-titulo">' + (p.proximamente ? '¿Quieres que te avisemos cuando llegue?' : '¿Quieres que te avisemos cuando vuelva?') + '</p>' +
     '<a class="btn btn-wa" href="' + esc(urlWhatsApp(textoAviso(p))) + '" target="_blank" rel="noopener">Avísame por WhatsApp</a>' +
     (avisoCopiado === p.id
       ? '<div class="copiado" style="margin-top:14px">✓ Mensaje copiado. Pégalo en nuestro chat de Instagram.</div>' +
@@ -358,26 +596,49 @@ function avisoHTML(p){
 }
 
 /* ---------- Ficha de producto ---------- */
-function renderFicha(p){
+let fichaEntradaId = null;   // qué ficha está abierta
+let fichaVarId = null;       // y qué variante (color) tiene elegida
+
+// Posición actual de la galería (0 = primera foto), para no perderla al repintar.
+function indiceGaleria(){
+  const pista = document.getElementById('galPista');
+  return pista && pista.clientWidth ? Math.round(pista.scrollLeft / pista.clientWidth) : 0;
+}
+
+function renderFicha(indice){
+  const e = ENTRADA_POR_ID[fichaEntradaId];
+  const p = POR_ID[fichaVarId];
   const ahora = Date.now();
-  const fotos = p.fotos.length ? p.fotos : [FOTO_VACIA];
-  const varias = fotos.length > 1;
+  const medios = e.fotos.length ? e.fotos : [FOTO_VACIA];
+  const varias = medios.length > 1;
   const dato = (titulo, valor) => valor ? '<div class="dato"><dt>' + titulo + '</dt><dd>' + esc(valor) + '</dd></div>' : '';
   const enCarrito = carrito[p.id] || 0;
+  const promos = e.disponible ? promosDe(p, ahora) : [];
+  const lineaTxt = e.linea ? ' · ' + e.linea : '';
   document.getElementById('fichaBody').innerHTML =
     '<div class="galeria"><div class="galeria-pista" id="galPista">' +
-      fotos.map((f, i) => '<img src="' + esc(f) + '" alt="' + esc(p.nombre) + ' — foto ' + (i + 1) + '">').join('') +
+      medios.map((f, i) => esVideo(f)
+        ? '<video src="' + esc(f) + '#t=0.1" controls playsinline preload="metadata" aria-label="Video de ' + esc(e.nombre) + '"></video>'
+        : '<img src="' + esc(f) + '" alt="' + esc(e.nombre) + ' — foto ' + (i + 1) + '">').join('') +
     '</div>' +
     (varias ? '<button type="button" class="galeria-nav galeria-prev" data-gal="-1" aria-label="Foto anterior">‹</button>' +
               '<button type="button" class="galeria-nav galeria-next" data-gal="1" aria-label="Foto siguiente">›</button>' +
-              '<div class="galeria-cuenta mono" id="galCuenta">1/' + fotos.length + '</div>' : '') +
+              '<div class="galeria-cuenta mono" id="galCuenta">1/' + medios.length + '</div>' : '') +
     '</div>' +
     '<div class="sheet-pad">' +
-      '<div class="eyebrow">' + esc(p.categoria) + (p.nuevo && p.disponible ? ' · Nuevo' : '') + '</div>' +
-      '<h2>' + esc(p.nombre) + '</h2>' +
+      '<div class="eyebrow">' + esc(e.categoria) + esc(lineaTxt) + (e.nuevo && e.disponible ? ' · Nuevo' : '') + '</div>' +
+      '<h2>' + esc(e.nombre) + '</h2>' +
+      (e.variantes.length > 1
+        ? '<div class="variantes"><div class="variantes-titulo">Color</div><div class="chips">' +
+          e.variantes.map(v => '<button type="button" class="chip' + (v.id === p.id ? ' activo' : '') + (v.disponible ? '' : ' agotado') +
+            '" data-variante="' + esc(v.id) + '">' + esc(v.variante || v.nombre) +
+            (v.disponible ? '' : (v.proximamente ? ' · Próximamente' : ' · Agotado')) + '</button>').join('') +
+          '</div></div>'
+        : '') +
       '<div class="ficha-precios">' + preciosHTML(p, ahora) + '</div>' +
       (p.disponible ? cuentaHTML(p, ahora, 'ficha-cuenta') : '') +
       (p.disponible && p.envioGratis ? '<div class="envio-gratis" style="margin-top:8px">🚚 Envío gratis llevando este producto</div>' : '') +
+      (promos.length ? '<div class="promo-caja">' + promos.map(t => '<div>🏷 ' + esc(t) + '</div>').join('') + '</div>' : '') +
       '<dl class="datos">' +
         dato('Descripción y medidas', p.descripcion) +
         // En cinturones la talla es la del pantalón (así está en el Canva); en el resto, "Tallas" a secas.
@@ -394,9 +655,10 @@ function renderFicha(p){
   if(varias){
     pista.addEventListener('scroll', () => {
       const i = Math.round(pista.scrollLeft / pista.clientWidth) + 1;
-      document.getElementById('galCuenta').textContent = i + '/' + fotos.length;
+      document.getElementById('galCuenta').textContent = i + '/' + medios.length;
     }, {passive:true});
   }
+  if(indice > 0) pista.scrollLeft = pista.clientWidth * indice;
 }
 
 document.getElementById('fichaBody').addEventListener('click', e => {
@@ -406,21 +668,26 @@ document.getElementById('fichaBody').addEventListener('click', e => {
     pista.scrollBy({left: pista.clientWidth * Number(nav.dataset.gal), behavior:'smooth'});
     return;
   }
+  const chip = e.target.closest('[data-variante]');
+  if(chip){
+    fichaVarId = chip.dataset.variante;
+    renderFicha(POR_ID[fichaVarId].indiceFoto);
+    return;
+  }
   const aviso = e.target.closest('[data-aviso-ig]');
   if(aviso){
     const p = POR_ID[aviso.dataset.avisoIg];
     copiar(textoAviso(p)).then(ok => {
-      if(ok){ avisoCopiado = p.id; renderFicha(p); }
+      if(ok){ avisoCopiado = p.id; renderFicha(indiceGaleria()); }
       else toast('No se pudo copiar. Escríbenos por Instagram con el nombre del producto.');
     });
     return;
   }
   const add = e.target.closest('[data-agregar]');
   if(add){
-    const p = POR_ID[add.dataset.agregar];
     if(agregar(add.dataset.agregar)){
       toast('Agregado al carrito');
-      renderFicha(p);
+      renderFicha(indiceGaleria());
     }
   }
 });
@@ -434,8 +701,8 @@ function renderCarrito(){
   const ahora = Date.now();
   const body = document.getElementById('carritoBody');
   const ids = Object.keys(carrito);
-  const validas = lineasValidas(ahora);
-  const total = validas.reduce((a, l) => a + l.sub, 0);
+  const ped = calcularPedido(ahora);
+  const validas = ped.lineas;
 
   if(pasoCarrito !== 'lista' && !validas.length) pasoCarrito = 'lista';
 
@@ -480,14 +747,14 @@ function renderCarrito(){
     if(!sePuedePedir(p)){
       // Estaba en el carrito y se agotó (o salió del catálogo): se avisa y no entra al pedido.
       return '<div class="linea fuera">' +
-        '<img src="' + esc(p ? fotoPrincipal(p) : FOTO_VACIA) + '" alt="">' +
+        '<img src="' + esc(p ? fotoDe(p) : FOTO_VACIA) + '" alt="">' +
         '<div><div class="linea-nombre">' + esc(p ? p.nombre : 'Producto que ya no está en el catálogo') + '</div>' +
         '<div class="linea-sub">Se agotó: no se incluye en el pedido</div></div>' +
         '<div class="linea-der"><button type="button" class="btn-link" data-quitar="' + esc(id) + '">Quitar</button></div></div>';
     }
     const unit = precioVigente(p, ahora);
     return '<div class="linea">' +
-      '<img src="' + esc(fotoPrincipal(p)) + '" alt="">' +
+      '<img src="' + esc(fotoDe(p)) + '" alt="">' +
       '<div><div class="linea-nombre">' + esc(p.nombre) + '</div>' +
       '<div class="linea-sub">' + fmtPrecio(unit) + (ofertaActiva(p, ahora) ? ' · oferta' : '') + (cant > 1 ? ' c/u' : '') + '</div></div>' +
       '<div class="linea-der"><div class="linea-total">' + fmtPrecio(unit * cant) + '</div>' +
@@ -496,12 +763,37 @@ function renderCarrito(){
       '<button type="button" data-cant="1" data-id="' + esc(id) + '" aria-label="Agregar uno">+</button></div></div></div>';
   }).join('');
 
-  body.innerHTML = '<div class="sheet-pad"><h2>Tu pedido</h2>' + filas +
-    '<div class="total"><span>Total</span><b>' + fmtPrecio(total) + '</b></div>' +
-    (pedidoConEnvioGratis(validas)
-      ? '<div class="envio-gratis envio-gratis-caja">🚚 Tu pedido va con envío gratis</div>' +
-        '<p class="nota-chica">La entrega se coordina por chat. Pagas contraentrega, con Yape o transferencia.</p>'
-      : '<p class="nota-chica">El envío se coordina por chat. Pagas contraentrega, con Yape o transferencia.</p>') +
+  // Promos aplicadas (solo si hay).
+  const promosHTML = ped.promos.length
+    ? '<div class="fila-total"><span>Subtotal</span><span>' + fmtPrecio(ped.subtotal) + '</span></div>' +
+      ped.promos.map(x => '<div class="promo-linea"><span>🏷 ' + esc(x.promo.nombre) + (x.veces > 1 ? ' ×' + x.veces : '') +
+        '</span><span>−' + fmtPrecio(x.monto) + '</span></div>').join('')
+    : '';
+
+  // Cómo lo recibe: opcional, y sin número fijo si el pedido ya tiene envío gratis.
+  const envios = cfg.ENVIOS || [];
+  const opcionHTML = (id, nombre, precio, nota, sel) =>
+    '<label class="opcion' + (sel ? ' sel' : '') + '"><input type="radio" name="envio" value="' + esc(id) + '"' + (sel ? ' checked' : '') + '>' +
+    '<span class="opcion-cuerpo"><span class="opcion-fila"><span class="opcion-nombre">' + esc(nombre) + '</span>' +
+    (precio ? '<span class="opcion-precio">' + esc(precio) + '</span>' : '') + '</span>' +
+    (sel && nota ? '<span class="opcion-nota">' + esc(nota) + '</span>' : '') + '</span></label>';
+  const enviosHTML = envios.length && validas.length
+    ? '<div class="envio-bloque"><div class="variantes-titulo">¿Cómo lo recibes? (opcional)</div>' +
+      envios.map(x => opcionHTML(x.id, x.nombre, ped.gratis ? 'Gratis' : x.etiqueta, x.nota, envioSel === x.id)).join('') +
+      opcionHTML('', 'Lo coordino por chat', '', 'Te confirmamos el costo exacto según tu distrito.', !envioSel) +
+      '</div>'
+    : '';
+  const totalAprox = (!ped.gratis && ped.envio && ped.costoEnvio > 0)
+    ? '<div class="fila-total"><span>Envío aprox.</span><span>' + fmtPrecio(ped.costoEnvio) + '</span></div>' +
+      '<div class="total"><span>Total aprox.</span><b>' + fmtPrecio(ped.productos + ped.costoEnvio) + '</b></div>'
+    : '<div class="total"><span>Total productos</span><b>' + fmtPrecio(ped.productos) + '</b></div>';
+
+  body.innerHTML = '<div class="sheet-pad"><h2>Tu pedido</h2>' + filas + promosHTML + enviosHTML +
+    '<div class="resumen-total">' + totalAprox + '</div>' +
+    (ped.gratis
+      ? '<div class="envio-gratis envio-gratis-caja">🚚 Tu pedido va con envío gratis</div>'
+      : '') +
+    '<p class="nota-chica">El costo de envío es aproximado y se confirma por chat. Pagas contraentrega, con Yape o transferencia.</p>' +
     (validas.length
       ? '<button type="button" class="btn btn-primario" data-paso="canal">Cerrar pedido</button>'
       : '<button type="button" class="btn" disabled>No hay productos disponibles en tu carrito</button>') +
@@ -543,6 +835,13 @@ function copiar(texto){
   return Promise.resolve(viejo());
 }
 
+document.getElementById('carritoBody').addEventListener('change', e => {
+  if(e.target.name === 'envio'){
+    envioSel = e.target.value;
+    guardarEnvio();
+    renderCarrito();
+  }
+});
 document.getElementById('carritoBody').addEventListener('click', e => {
   const t = e.target;
   const cant = t.closest('[data-cant]');
@@ -573,16 +872,32 @@ function ruta(){
   const fichaOv = document.getElementById('fichaOverlay');
   const carritoOv = document.getElementById('carritoOverlay');
   let abierto = null;
+  let indiceNuevo = 0;
+  fichaEntradaId = h.indexOf('#/p/') === 0 ? fichaEntradaId : null;
   if(h.indexOf('#/p/') === 0){
-    const p = POR_ID[decodeURIComponent(h.slice(4))];
-    if(p){ renderFicha(p); abierto = fichaOv; }
+    // El enlace puede ser el de un grupo (g-collar-gengar) o el de una variante.
+    const clave = decodeURIComponent(h.slice(4));
+    const e = ENTRADA_POR_ID[clave];
+    if(e){
+      if(fichaEntradaId !== e.id){
+        fichaEntradaId = e.id;
+        fichaVarId = (clave !== e.id && POR_ID[clave]) ? clave : repVariante(e).id;
+        indiceNuevo = POR_ID[fichaVarId].indiceFoto;
+      } else {
+        indiceNuevo = indiceGaleria();   // repintado (ej. venció una oferta): se queda donde estaba
+      }
+      abierto = fichaOv;
+    }
   } else if(h === '#/carrito'){
-    renderCarrito();
     abierto = carritoOv;
   }
+  // Primero se muestra la hoja y recién después se pinta: así la galería ya
+  // tiene ancho y puede saltar a la foto de la variante elegida.
   fichaOv.hidden = abierto !== fichaOv;
   carritoOv.hidden = abierto !== carritoOv;
   document.body.classList.toggle('sin-scroll', !!abierto);
+  if(abierto === fichaOv) renderFicha(indiceNuevo);
+  if(abierto === carritoOv) renderCarrito();
   if(abierto) abierto.querySelector('.sheet').scrollTop = 0;
 }
 function cerrarHoja(){
@@ -613,11 +928,14 @@ document.addEventListener('error', e => {
 
 /* ---------- Ofertas con temporizador ---------- */
 // Cada segundo se actualizan las cuentas regresivas. Además se compara qué
-// ofertas están vigentes contra el segundo anterior: en el instante en que una
-// vence, se vuelve a pintar todo y el producto regresa SOLO a su precio normal
-// (grilla, ficha abierta y carrito), sin recargar y sin que nadie toque nada.
+// ofertas y promos están vigentes contra el segundo anterior: en el instante en
+// que una vence, se vuelve a pintar todo y el producto regresa SOLO a su precio
+// normal (grilla, ficha abierta y carrito), sin recargar y sin que nadie toque nada.
 let firmaOfertas = '';
-function calcFirma(ahora){ return PRODUCTOS.map(p => ofertaActiva(p, ahora) ? '1' : '0').join(''); }
+function calcFirma(ahora){
+  return PRODUCTOS.map(p => ofertaActiva(p, ahora) ? '1' : '0').join('') + '|' +
+         PROMOS.map(pr => promoActiva(pr, ahora) ? '1' : '0').join('');
+}
 setInterval(() => {
   const ahora = Date.now();
   const firma = calcFirma(ahora);
@@ -663,6 +981,7 @@ function renderTodo(){
 
 /* ---------- Arranque ---------- */
 document.getElementById('pieInstagram').href = urlInstagram();
+document.getElementById('heroWa').href = urlWhatsApp('¡Hola Timeless! Quiero consultar por un producto');
 if(cfg.TIKTOK_USUARIO){
   const tk = document.getElementById('pieTikTok');
   tk.href = 'https://www.tiktok.com/@' + encodeURIComponent(cfg.TIKTOK_USUARIO);
